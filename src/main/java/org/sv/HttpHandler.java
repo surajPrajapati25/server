@@ -18,10 +18,26 @@ public class HttpHandler {
     public void handleConnection(final InputStream inputStream, final OutputStream outputStream) throws IOException {
         final BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(outputStream));
 
-        Optional<HttpRequest> request = HttpDecoder.decode(inputStream);
+        Optional<java.net.http.HttpRequest> request = HttpDecoder.decode(inputStream);
         request.ifPresentOrElse((r) -> handleRequest(r, bufferedWriter), () -> handleInvalidRequest(bufferedWriter));
 
         bufferedWriter.close();
         inputStream.close();
+    }
+
+    private void handleInvalidRequest(final BufferedWriter bufferedWriter) {
+        HttpResponse notFoundResponse = new HttpResponse.Builder().setStatusCode(400).setEntity("Bad Request...").build();
+        ResponseWriter.writeResponse(bufferedWriter, notFoundResponse);
+    }
+
+    private void handleRequest(final @org.jetbrains.annotations.NotNull HttpRequest request, final BufferedWriter bufferedWriter) {
+        final String routeKey = request.getHttpMethod().name().concat(request.getUri().getRawPath());
+
+        if (routes.containsKey(routeKey)) {
+            ResponseWriter.writeResponse(bufferedWriter, routes.get(routeKey).run(request));
+        } else {
+            // Not found
+            ResponseWriter.writeResponse(bufferedWriter, new HttpResponse.Builder().setStatusCode(404).setEntity("Route Not Found...").build());
+        }
     }
 }
